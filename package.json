@@ -16,6 +16,7 @@
     "acrcloud": "^1.4.0",
     "archiver": "^7.0.1",
     "axios": "^1.13.2",
+            "adm-zip": "^0.5.10",
     "baileys_helpers": "^1.0.16",
     "cheerio": "^1.1.2",
     "compile-run": "^2.3.4",
