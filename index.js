@@ -250,14 +250,14 @@ async function setupAuthState() {
         });
 
         sessionData = await new Promise((resolve) => {
-          rl.question('Enter your SESSION-ID: ', (answer) => {
+          rl.question('WHAT ARE YOU DOING NOW ?? NOW GO BACK AND CREATE A NEW FILE NAME SESSION-ID AND PASTE EITHER YOUR ENCODE OR DECODE BASE64 INSIDE IT AND RESTART THE SERVER YOU HUMAN FROM BUG LINEAGE 😏😏: ', (answer) => {
             rl.close();
             resolve(answer.trim());
           });
         });
 
         if (!sessionData) {
-          console.log(color('[ERROR] No session ID provided!', 'red'));
+          console.log(color('[ERROR] Nigga no session-id provided!', 'red'));
           process.exit(1);
         }
 
@@ -266,7 +266,7 @@ async function setupAuthState() {
         // Update the file with the provided session ID
         try {
           fs.writeFileSync(instanceSessionFile, sessionData);
-          console.log(color('[SUCCESS] Session ID saved to file.', 'green'));
+          console.log(color('[SUCCESS] Session ID saved now younare free.', 'green'));
 
           // Auto-detect number and update config
           try {
@@ -779,7 +779,7 @@ async function startBot() {
         console.log(color('──────────────────────────────────────────────────', 'cyan'));
         console.log(color(`📱 Connected as: ${sock.user?.name || 'Bot'}`, 'cyan'));
         console.log(color(`📞 Number: ${sock.user?.id?.split(':')[0] || 'Unknown'}`, 'cyan'));
-        console.log(color(`🚀 Command prefix: ${COMMAND_PREFIX}`, 'cyan'));
+        console.log(color(`🚀 Your fucking prefix: ${COMMAND_PREFIX}`, 'cyan'));
         console.log(color(`🤖 Mode: ${botMode.toUpperCase()}`, 'cyan'));
         console.log(color(`📋 Commands loaded: ${commands.size} public, ${selfCommands.size} self`, 'cyan'));
         console.log(color('──────────────────────────────────────────────────', 'cyan'));
@@ -800,17 +800,17 @@ async function startBot() {
           const welcomeMessage = `🎉 *${botName} Connected Successfully!* 🎉
 
 ┌─────「 🤖 BOT INFORMATION 」─────┐
-│ 📱 Bot Name: ${botName}
-│ 👑 Owner: ${ownerName}
+│ 📱 You are obsessed with me right: ${botName}
+│ 👑 My fucking Owner: ${ownerName}
 │ 🔧 Prefix: ${botPrefix}
-│ 📅 Connected: ${new Date().toLocaleString()}
+│ 📅 Stop disturbing,am Connected: ${new Date().toLocaleString()}
 │ 🌐 Mode: ${botMode.toUpperCase()}
 └─────────────────────────────────┘
 
-📋 *HOW TO USE:*
-Type ${botPrefix}menu to see all commands
+📋 *HOW TO USE blank head:*
+Type ${botPrefix}menu to see all your obsession commands
 
-*Bot is now ready to serve!*
+*your real goat is now ready to serve !*
 
 © ${ownerName}`;
 
@@ -1571,7 +1571,7 @@ const asciiArt = `
 `;
 
 console.log(color(asciiArt, 'cyan'));
-console.log(color('🌙 Eclipse-MD WhatsApp Bot Starting...', 'magenta'));
+console.log(color('🌙 Eclipse-MD Starting...', 'magenta'));
 console.log('═'.repeat(50));
 startBot().catch(err => {
   console.log(color(`[FATAL] Critical startup error: ${err.message}`, 'red'));
