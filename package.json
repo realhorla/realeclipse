@@ -45,6 +45,7 @@
     "nodemailer": "^7.0.12",
     "openai": "^4.104.0",
     "openid-client": "^6.8.1",
+    "node-shazam":"latest",
     "pastebin-js": "^1.0.6",
     "pino": "^8.21.0",
     "sharp": "^0.34.5",
