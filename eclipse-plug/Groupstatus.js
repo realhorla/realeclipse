@@ -3,19 +3,31 @@ import { downloadContentFromMessage } from '@whiskeysockets/baileys';
 
 export default {
   name: 'groupstatus',
-  description: 'Post a message as Group Status',
+  description: 'Post a message as Group Status (Admin Only)',
   category: 'Group',
   aliases: ['gstatus', 'gst'],
 
   async execute(msg, { sock }) {
-
     try {
-
       const from = msg.key.remoteJid;
 
       if (!from.endsWith('@g.us')) {
         return sock.sendMessage(from, {
           text: '❌ This command can only be used in groups.'
+        }, { quoted: msg });
+      }
+
+      // ==========================
+      // 1️⃣ Check if sender is admin
+      // ==========================
+      const groupMetadata = await sock.groupMetadata(from);
+      const participants = groupMetadata.participants;
+      const senderNumber = msg.key.participant;
+
+      const senderAdmin = participants.find(p => p.id === senderNumber)?.admin;
+      if (!senderAdmin) {
+        return sock.sendMessage(from, {
+          text: '❌ You are not an admin!'
         }, { quoted: msg });
       }
 
@@ -36,7 +48,6 @@ export default {
       // TEXT ONLY
       // ===============================
       if (!quoted && textInput) {
-
         innerMessage = {
           extendedTextMessage: {
             text: textInput,
@@ -70,8 +81,7 @@ export default {
         for await (const chunk of stream)
           buffer = Buffer.concat([buffer, chunk]);
 
-        // 🔥 THIS IS THE FIX
-        // Upload media properly using generateWAMessage
+        // Upload media properly using Baileys
         const uploaded = await sock.sendMessage(
           from,
           {
@@ -87,7 +97,6 @@ export default {
       // ===============================
       // WRAP IN GROUP STATUS V2
       // ===============================
-
       const payload = {
         groupStatusMessageV2: {
           message: innerMessage
@@ -100,7 +109,7 @@ export default {
       await sock.relayMessage(from, payload, { messageId });
 
       await sock.sendMessage(from, {
-        text: '✅ Group Status Posted _powered by horlapookie_!'
+        text: '✅ Group Status Posted!'
       }, { quoted: msg });
 
     } catch (err) {
