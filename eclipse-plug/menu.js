@@ -99,6 +99,7 @@ export default {
 ┃✪  ${prefix}lock
 ┃✪  ${prefix}promote
 ┃✪  ${prefix}remove
+┃✪  ${prefix}groupstatus
 ┃✪  ${prefix}tagall
 ┃✪  ${prefix}unlock
 ┃✪  ${prefix}open
