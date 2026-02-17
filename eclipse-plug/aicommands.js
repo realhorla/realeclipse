@@ -231,6 +231,10 @@ async function handleSpecialAI(endpoint, msg, sock, args, settings, paramName = 
     
     const response = await axios.get(`https://apis.prexzyvilla.site/ai/${endpoint}`, {
       params: { [paramName]: prompt },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+      },
       timeout: 60000
     });
     
