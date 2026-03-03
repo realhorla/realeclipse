@@ -65,7 +65,7 @@ export default {
     const menuText = `╔╭━━〔 *𝔼𝕔𝕝ɪᴘꜱᴇ 𝕄𝔻* 〕━━╮
 
 │ ✦ Mᴏᴅᴇ : ${global.botMode || 'public'}
-│ ✦ Pʟᴜɢɪɴs : 655
+│ ✦ Pʟᴜɢɪɴs : 656
 │ ✦ Vᴇʀsɪᴏɴ : 1.2.6
 │ ✦ Year : 2025 - 2026
 │ ✦ Under Maintainance : true
@@ -591,6 +591,7 @@ export default {
 ╭━━━✦❮ ⚙️ SELF SETTINGS ❯✦━⊷
 ┃✪  ${prefix}settings 
 ┃✪  ${prefix}emojitoggle 
+┃✪  ${prefix}settheme
 ┃✪  ${prefix}goodmorning
 ┃✪  ${prefix}goodnight
 ┃✪  ${prefix}keepon
@@ -699,7 +700,7 @@ export default {
 ━━━━━━━━━━━━━━━━━━━━━━`;
 
     await sock.sendMessage(from, { 
-        image: { url: mediaUrls.menuImage },
+        image: { url: global.menuImage || mediaUrls.menuImage },
         caption: menuText,
         ...channelInfo
     }, { quoted: msg });
