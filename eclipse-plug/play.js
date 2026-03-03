@@ -1,40 +1,32 @@
-import yts from 'yt-search';
-import fs from 'fs';
-import path from 'path';
-import { exec } from 'child_process';
-import util from 'util';
-import ytdl from '@distube/ytdl-core';
-import { fileURLToPath } from 'url';
-import axios from 'axios';
-import { musicDownloader, alternativeSource, musicApi, logNetworkError } from '../lib/musicHelper.js';
+import axios from "axios";
+import yts from "yt-search";
+import fs from "fs";
+import path from "path";
 
-// Load emojis
-const emojisPath = path.join(process.cwd(), 'data', 'emojis.json');
-const emojis = JSON.parse(fs.readFileSync(emojisPath, 'utf8'));
+const emojis = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "data", "emojis.json"), "utf8")
+);
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const execPromise = util.promisify(exec);
-
-let ytdlp;
-try {
-    const ytdlpModule = await import('yt-dlp-exec');
-    ytdlp = ytdlpModule.default;
-} catch (_) {
-    ytdlp = null;
-}
+const sessions = new Map();
 
 export default {
-    name: 'play',
-    description: 'Download and send music from YouTube as voice note',
-    aliases: ['song', 'music'],
-    category: 'Media',
+    name: "play",
+    description: "Search YouTube and download audio",
+    category: "Media",
+    aliases: ["song", "music"],
+
+    async execute(msg, { sock, args }) {
+        const from = msg.key.remoteJid;
+        let input = args.join(" ").trim();
+        const bodyText = (msg.message?.conversation || 
+                         msg.message?.extendedTextMessage?.text || "").trim();
+        
         let selection = "";
         if (input === "1" || input === "2") {
             selection = input;
         } else if (msg.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
-            const quotedText = msg.message.extendedTextMessage.text || "";
+            const quotedMsg = msg.message.extendedTextMessage.contextInfo.quotedMessage;
+            const quotedText = (quotedMsg.conversation || quotedMsg.extendedTextMessage?.text || "").trim();
             if (quotedText === "1" || quotedText === "2") {
                 selection = quotedText;
             }
@@ -79,7 +71,7 @@ export default {
         }
 
         if (!input) {
-            return sock.sendMessage(from, { text: `❌ *Provide search query*` }, { quoted: msg });
+            return sock.sendMessage(from, { text: `❌ *Provide search query or link*` }, { quoted: msg });
         }
 
         await sock.sendMessage(from, { react: { text: emojis.processing, key: msg.key } });
@@ -90,7 +82,6 @@ export default {
                  return sock.sendMessage(from, { text: `❌ No results found for "${input}"` }, { quoted: msg });
             }
             const video = search.videos[0];
-            
             sessions.set(from, video);
 
             const menuText = `🎵 *${video.title}*

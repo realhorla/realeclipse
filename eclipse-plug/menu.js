@@ -44,7 +44,11 @@ export default {
 
     const bodyText = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.buttonsResponseMessage?.selectedButtonId || msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId || "").trim();
     
-    if (bodyText.toLowerCase() === "next") {
+    // Add quoted message support for "next"
+    const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+    const quotedText = (quotedMsg?.conversation || quotedMsg?.extendedTextMessage?.text || "").trim();
+
+    if (bodyText.toLowerCase() === "next" || (quotedText.includes("Reply with \"next\"") && bodyText.toLowerCase() === "next")) {
         const nextMenu = `╔════ *SUPPORT & LINKS* ════╗
         
 📱 *GitHub:* https://github.com/horlapookie/Eclipse-MD
@@ -61,7 +65,7 @@ export default {
     const menuText = `╔╭━━〔 *𝔼𝕔𝕝ɪᴘꜱᴇ 𝕄𝔻* 〕━━╮
 
 │ ✦ Mᴏᴅᴇ : ${global.botMode || 'public'}
-│ ✦ Pʟᴜɢɪɴs : 650
+│ ✦ Pʟᴜɢɪɴs : 655
 │ ✦ Vᴇʀsɪᴏɴ : 1.2.6
 │ ✦ Year : 2025 - 2026
 │ ✦ Under Maintainance : true
@@ -371,6 +375,11 @@ export default {
 ┃✪  ${prefix}twitter
 ┃✪  ${prefix}yt
 ┃✪  ${prefix}movie
+┃✪  ${prefix}pastebin
+┃✪  ${prefix}mediafire
+┃✪  ${prefix}googledrive
+┃✪  ${prefix}snackdl
+┃✪  ${prefix}aiodl
 ╰━━━━━━━━━━━━━━━━━⊷
 
 ╭━━━✦❮ 📚 MANGA COMMANDS ❯✦━⊷

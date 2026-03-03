@@ -1261,7 +1261,33 @@ Type ${botPrefix}menu to see all your obsession commands
               console.log(`[INFO] Skipping unsupported message type: ${messageType}`);
               return;
           }
-          if (!body || typeof body !== 'string') return;
+          // Handle direct replies to menu/selections
+          const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+          const quotedText = (quotedMsg?.conversation || quotedMsg?.extendedTextMessage?.text || "").trim();
+
+          if (body && !body.startsWith(COMMAND_PREFIX)) {
+            // Check if this is a reply to a selection menu (1, 2) or "next"
+            if (body === "1" || body === "2" || body.toLowerCase() === "next") {
+              // We need to find which command this reply belongs to.
+              // For "next", menu.js handles it by checking the quoted message content.
+              // For "1" or "2", play.js and video.js handle it via sessions.
+              
+              // To make sure the command execution logic triggers for these plain text replies,
+              // we check if they are replies to known menu messages.
+              if (quotedText.includes('Reply with a number') || quotedText.includes('Reply with "next"')) {
+                 // Map these to the original command or a special handler if needed.
+                 // In this bot, the plugins (play.js, video.js, menu.js) are called even if prefix is missing
+                 // but only if we force it here or if they are registered as "onMessage" handlers.
+                 // Since they are standard commands, we'll prefix them internally to trigger the same logic.
+                 if (body === "1" || body === "2") {
+                    // Try to infer which command it was. This is tricky without state.
+                    // But the plugins already use a 'sessions' Map keyed by remoteJid.
+                    // So we just need to trigger ANY command that uses sessions.
+                    // We'll use a dummy 'process_session' command or just let it pass to all commands.
+                 }
+              }
+            }
+          }
 
           // Attach body to msg object for commands that need it
           msg.body = body;
@@ -1460,32 +1486,44 @@ Type ${botPrefix}menu to see all your obsession commands
             // Get command from appropriate command set based on mode
             let command;
 
-            if (botMode === 'self') {
-              // In self mode, bot can use both public and self commands
-              command = commands.get(commandName) || selfCommands.get(commandName);
-              if (!command) {
-                // In self mode, don't send "unknown command" messages
-                // Just silently ignore unknown commands
-                return;
-              }
-            } else {
-              // In public mode, check if it's a self command first
-              if (selfCommands.get(commandName)) {
-                const targetJid = isFromMe ? remoteJid : senderNumber + '@s.whatsapp.net';
-                await sock.sendMessage(targetJid, {
-                  text: `🤖 Bot is in PUBLIC mode. Switch to SELF mode to use this command.\nUse \`${COMMAND_PREFIX}self\` to switch modes.`,
-                }, { quoted: msg });
-                return;
-              }
+            // SPECIAL CASE: If body is 1, 2, or next and it's a reply, try to handle it even without prefix
+            if (!body.startsWith(COMMAND_PREFIX) && (body === "1" || body === "2" || body.toLowerCase() === "next")) {
+                const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                const quotedText = (quotedMsg?.conversation || quotedMsg?.extendedTextMessage?.text || "").trim();
+                
+                if (body.toLowerCase() === "next") command = commands.get("menu");
+                else if (quotedText.includes("🎵") || quotedText.includes("Music")) command = commands.get("play");
+                else if (quotedText.includes("🎬") || quotedText.includes("Video")) command = commands.get("video");
+            }
 
-              // Check for public commands
-              command = commands.get(commandName);
-              if (!command) {
-                const targetJid = isFromMe ? remoteJid : senderNumber + '@s.whatsapp.net';
-                await sock.sendMessage(targetJid, {
-                  text: `❓ Unknown command: *${commandName}*\nTry \`${COMMAND_PREFIX}menu\` for available commands.`,
-                }, { quoted: msg });
-                return;
+            if (!command) {
+              if (botMode === 'self') {
+                // In self mode, bot can use both public and self commands
+                command = commands.get(commandName) || selfCommands.get(commandName);
+                if (!command) {
+                  // In self mode, don't send "unknown command" messages
+                  // Just silently ignore unknown commands
+                  return;
+                }
+              } else {
+                // In public mode, check if it's a self command first
+                if (selfCommands.get(commandName)) {
+                  const targetJid = isFromMe ? remoteJid : senderNumber + '@s.whatsapp.net';
+                  await sock.sendMessage(targetJid, {
+                    text: `🤖 Bot is in PUBLIC mode. Switch to SELF mode to use this command.\nUse \`${COMMAND_PREFIX}self\` to switch modes.`,
+                  }, { quoted: msg });
+                  return;
+                }
+
+                // Check for public commands
+                command = commands.get(commandName);
+                if (!command) {
+                  const targetJid = isFromMe ? remoteJid : senderNumber + '@s.whatsapp.net';
+                  await sock.sendMessage(targetJid, {
+                    text: `❓ Unknown command: *${commandName}*\nTry \`${COMMAND_PREFIX}menu\` for available commands.`,
+                  }, { quoted: msg });
+                  return;
+                }
               }
             }
 
