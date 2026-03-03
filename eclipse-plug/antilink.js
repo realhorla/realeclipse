@@ -80,13 +80,13 @@ async function handleAntilinkCommand(sock, chatId, userMessage, senderId, isSend
                 break;
 
             case 'set':
-                if (args.length < 2) {
+                const setAction = subArgs[1]?.toLowerCase();
+                if (!setAction) {
                     await sock.sendMessage(chatId, { 
                         text: `*_Please specify an action: ${prefix}antilink set delete | kick | warn_*` 
                     });
                     return;
                 }
-                const setAction = args[1];
                 if (!['delete', 'kick', 'warn'].includes(setAction)) {
                     await sock.sendMessage(chatId, { 
                         text: '*_Invalid action. Choose delete, kick, or warn._*' 
