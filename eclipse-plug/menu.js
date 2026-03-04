@@ -42,31 +42,62 @@ export default {
     const totalMemory = Math.round((memUsage.heapTotal / 1024 / 1024) * 100) / 100;
     const memoryPercent = Math.round((usedMemory / totalMemory) * 100);
 
-    const bodyText = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.buttonsResponseMessage?.selectedButtonId || msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId || "").trim();
     
-    // Add quoted message support for "next"
-    const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-    const quotedText = (quotedMsg?.conversation || quotedMsg?.extendedTextMessage?.text || "").trim();
+const bodyText = (
+  msg.message?.conversation ||
+  msg.message?.extendedTextMessage?.text ||
+  msg.message?.buttonsResponseMessage?.selectedButtonId ||
+  msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+  msg.message?.imageMessage?.caption ||
+  msg.message?.videoMessage?.caption ||
+  msg.message?.documentMessage?.caption ||
+  ""
+).trim();
 
-    if (bodyText.toLowerCase() === "next" || (quotedText.includes("Reply with \"next\"") && bodyText.toLowerCase() === "next")) {
-        const nextMenu = `╔════ *SUPPORT & LINKS* ════╗
+// ✅ Add quoted message support for "next" (works with image captions too)
+const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+
+const quotedText = (
+  quotedMsg?.conversation ||
+  quotedMsg?.extendedTextMessage?.text ||
+  quotedMsg?.imageMessage?.caption ||
+  quotedMsg?.videoMessage?.caption ||
+  quotedMsg?.documentMessage?.caption ||
+  ""
+).trim();
+
+const bodyLower = bodyText.toLowerCase();
+
+if (bodyLower === "next") {
+  // Optional safety: only accept "next" if they replied to a menu message
+  // If you want "next" to work always (even without replying), delete this if block.
+  const ok =
+    !quotedMsg ||
+    quotedText.includes('Reply with "next"') ||
+    quotedText.includes('Reply with "next"') ||
+    (quotedText.toLowerCase().includes("reply") && quotedText.toLowerCase().includes("next"));
+
+  if (ok) {
+    const nextMenu = `╔════ *SUPPORT & LINKS* ════╗
         
 📱 *GitHub:* https://github.com/horlapookie/Eclipse-MD
 🆘 *Support:* https://www.eclipse-support.zone.id  
-🛫 *Deploy:* https://eclipse-md-horlapookie.zone.id
+🛫 *Deploy:* https://eternal-hosting.name.ng
 👿 *Bug Report:* https://github.com/horlapookie/Eclipse-MD/issues
 📣 *Telegram Channel:* https://t.me/yourhighnesstech1 
 📞 *Direct Telegram:* https://t.me/horlapookie
 
 ╚════════════════════════════╝`;
-        return sock.sendMessage(from, { text: nextMenu, ...channelInfo }, { quoted: msg });
-    }
+
+    return sock.sendMessage(from, { text: nextMenu, ...channelInfo }, { quoted: msg });
+  }
+}
 
     const menuText = `╔╭━━〔 *𝔼𝕔𝕝ɪᴘꜱᴇ 𝕄𝔻* 〕━━╮
 
 │ ✦ Mᴏᴅᴇ : ${global.botMode || 'public'}
 │ ✦ Pʟᴜɢɪɴs : 656
-│ ✦ Vᴇʀsɪᴏɴ : 1.2.6
+│ ✦ Vᴇʀsɪᴏɴ : 1.3.9
 │ ✦ Year : 2025 - 2026
 │ ✦ Under Maintainance : true
 │ ✦ Uᴘᴛɪᴍᴇ : ${uptimeString}

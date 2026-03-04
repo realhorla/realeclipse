@@ -1262,6 +1262,7 @@ Type ${botPrefix}menu to see all your obsession commands
               console.log(`[INFO] Skipping unsupported message type: ${messageType}`);
               return;
           }
+
           // ===============================
           // QUICK REPLY ROUTER (NO PREFIX)
           // Handles: 1 / 2 for play+video sessions, and "next" for menu
@@ -1275,7 +1276,6 @@ Type ${botPrefix}menu to see all your obsession commands
               msg.message?.documentMessage?.caption ||
               "").trim();
 
-          // Read quoted message text/caption properly (works for image captions too)
           const quotedMsg2 = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
           const quotedText2 = (
             quotedMsg2?.conversation ||
@@ -1286,16 +1286,23 @@ Type ${botPrefix}menu to see all your obsession commands
             ""
           ).trim();
 
-          // Only handle if user did NOT use prefix
           if (replyBody && !replyBody.startsWith(COMMAND_PREFIX)) {
             const lower = replyBody.toLowerCase();
 
+            // ✅ safe settings (prevents ReferenceError)
+            const safeSettings =
+              (typeof settings !== "undefined" && settings) ||
+              global.settings ||
+              globalThis.settings ||
+              {};
+
             // ---- A) NEXT for menu pagination ----
             if (lower === "next") {
-              // Only accept next if they replied to a menu prompt (optional safety)
+              // optional safety: only when replying to a menu
               const looksLikeMenu =
+                !quotedMsg2 || // allow plain "next" too
                 quotedText2.includes('Reply with "next"') ||
-                quotedText2.toLowerCase().includes("reply with") ||
+                quotedText2.toLowerCase().includes("reply") ||
                 quotedText2.toLowerCase().includes("next");
 
               if (looksLikeMenu) {
@@ -1306,7 +1313,7 @@ Type ${botPrefix}menu to see all your obsession commands
                   null;
 
                 if (menuCmd?.execute) {
-                  await menuCmd.execute(msg, { sock, args: ["next"], settings });
+                  await menuCmd.execute(msg, { sock, args: ["next"], settings: safeSettings });
                   return;
                 }
               }
@@ -1317,7 +1324,6 @@ Type ${botPrefix}menu to see all your obsession commands
               const playCmd = commands.get("play");
               const videoCmd = commands.get("video");
 
-              // ✅ DO NOT rely on quotedText; rely on sessions inside each plugin
               if (playCmd?.onReply) {
                 const handled = await playCmd.onReply(msg, sock);
                 if (handled) return;
@@ -1329,6 +1335,7 @@ Type ${botPrefix}menu to see all your obsession commands
               }
             }
           }
+
           // ===============================
           // END QUICK REPLY ROUTER
           // ===============================
