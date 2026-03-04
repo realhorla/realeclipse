@@ -1262,34 +1262,76 @@ Type ${botPrefix}menu to see all your obsession commands
               console.log(`[INFO] Skipping unsupported message type: ${messageType}`);
               return;
           }
-          // Handle direct replies to menu/selections
-          const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-          const quotedText = (quotedMsg?.conversation || quotedMsg?.extendedTextMessage?.text || "").trim();
+          // ===============================
+          // QUICK REPLY ROUTER (NO PREFIX)
+          // Handles: 1 / 2 for play+video sessions, and "next" for menu
+          // ===============================
 
-          if (body && !body.startsWith(COMMAND_PREFIX)) {
-            // Check if this is a reply to a selection menu (1, 2) or "next"
-            if (body === "1" || body === "2" || body.toLowerCase() === "next") {
-              // We need to find which command this reply belongs to.
-              // For "next", menu.js handles it by checking the quoted message content.
-              // For "1" or "2", play.js and video.js handle it via sessions.
-              
-              // To make sure the command execution logic triggers for these plain text replies,
-              // we check if they are replies to known menu messages.
-              if (quotedText.includes('Reply with a number') || quotedText.includes('Reply with "next"')) {
-                 // Map these to the original command or a special handler if needed.
-                 // In this bot, the plugins (play.js, video.js, menu.js) are called even if prefix is missing
-                 // but only if we force it here or if they are registered as "onMessage" handlers.
-                 // Since they are standard commands, we'll prefix them internally to trigger the same logic.
-                 if (body === "1" || body === "2") {
-                    // Try to infer which command it was. This is tricky without state.
-                    // But the plugins already use a 'sessions' Map keyed by remoteJid.
-                    // So we just need to trigger ANY command that uses sessions.
-                    // We'll use a dummy 'process_session' command or just let it pass to all commands.
-                 }
+          const replyBody =
+            (msg.message?.conversation ||
+              msg.message?.extendedTextMessage?.text ||
+              msg.message?.imageMessage?.caption ||
+              msg.message?.videoMessage?.caption ||
+              msg.message?.documentMessage?.caption ||
+              "").trim();
+
+          // Read quoted message text/caption properly (works for image captions too)
+          const quotedMsg2 = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+          const quotedText2 = (
+            quotedMsg2?.conversation ||
+            quotedMsg2?.extendedTextMessage?.text ||
+            quotedMsg2?.imageMessage?.caption ||
+            quotedMsg2?.videoMessage?.caption ||
+            quotedMsg2?.documentMessage?.caption ||
+            ""
+          ).trim();
+
+          // Only handle if user did NOT use prefix
+          if (replyBody && !replyBody.startsWith(COMMAND_PREFIX)) {
+            const lower = replyBody.toLowerCase();
+
+            // ---- A) NEXT for menu pagination ----
+            if (lower === "next") {
+              // Only accept next if they replied to a menu prompt (optional safety)
+              const looksLikeMenu =
+                quotedText2.includes('Reply with "next"') ||
+                quotedText2.toLowerCase().includes("reply with") ||
+                quotedText2.toLowerCase().includes("next");
+
+              if (looksLikeMenu) {
+                const menuCmd =
+                  commands.get("menu") ||
+                  commands.get("help") ||
+                  commands.get("commands") ||
+                  null;
+
+                if (menuCmd?.execute) {
+                  await menuCmd.execute(msg, { sock, args: ["next"], settings });
+                  return;
+                }
+              }
+            }
+
+            // ---- B) 1/2 for selection-based commands (play/video) ----
+            if (replyBody === "1" || replyBody === "2") {
+              const playCmd = commands.get("play");
+              const videoCmd = commands.get("video");
+
+              // ✅ DO NOT rely on quotedText; rely on sessions inside each plugin
+              if (playCmd?.onReply) {
+                const handled = await playCmd.onReply(msg, sock);
+                if (handled) return;
+              }
+
+              if (videoCmd?.onReply) {
+                const handled = await videoCmd.onReply(msg, sock);
+                if (handled) return;
               }
             }
           }
-
+          // ===============================
+          // END QUICK REPLY ROUTER
+          // ===============================
           // Attach body to msg object for commands that need it
           msg.body = body;
 

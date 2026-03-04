@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
-import { updateSetting } from '../lib/persistentData.js';
+import { updateSetting } from '../../lib/persistentData.js';
 
 export default {
     name: 'settheme',
