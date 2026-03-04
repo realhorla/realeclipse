@@ -86,6 +86,7 @@ const parseBoolEnv = (key, defaultValue) => {
 global.menuImage = persistentSettings.menuImage || null;
 global.autoViewMessage = parseBoolEnv('AUTO_VIEW_MESSAGE', persistentSettings.autoViewMessage || false);
 global.autoViewStatus = parseBoolEnv('AUTO_VIEW_STATUS', persistentSettings.autoViewStatus || false);
+global.movieSubCache = {};
 global.autoReactStatus = parseBoolEnv('AUTO_REACT_STATUS', persistentSettings.autoReactStatus || false);
 global.autoReact = parseBoolEnv('AUTO_REACT', persistentSettings.autoReact || false);
 global.autoStatusEmoji = process.env.AUTO_STATUS_EMOJI || persistentSettings.autoStatusEmoji || '❤️';
@@ -1154,191 +1155,274 @@ Type ${botPrefix}menu to see all your obsession commands
           // Store ALL messages for antidelete tracking (not just bot's own messages)
           await storeMessage(sock, msg);
 
-          let body = '';
-          const messageType = Object.keys(msg.message)[0];
-          if (messageType === 'protocolMessage') {
-            // Check if it's a message deletion (revoke)
-            if (msg.message.protocolMessage?.type === 0) {
-              await handleMessageRevocation(sock, msg);
-            }
-            return; // Skip protocol messages after handling
-          }
-          switch (messageType) {
-            case 'conversation':
-              body = msg.message.conversation;
-              break;
-            case 'extendedTextMessage':
-              body = msg.message.extendedTextMessage.text;
-              break;
-            case 'imageMessage':
-              body = msg.message.imageMessage.caption || '';
-              break;
-            case 'videoMessage':
-              body = msg.message.videoMessage.caption || '';
-              break;
-            case 'newsletterAdminInviteMessage':
-              body = msg.message.newsletterAdminInviteMessage.text || '';
-              break;
-            case 'messageContextInfo':
-              // Handle newsletter forwarded messages
-              if (msg.message.messageContextInfo?.extendedTextMessage) {
-                body = msg.message.messageContextInfo.extendedTextMessage.text;
-              } else if (msg.message.messageContextInfo?.conversation) {
-                body = msg.message.messageContextInfo.conversation;
-              } else {
-                body = '';
-              }
-              break;
-            case 'buttonsResponseMessage':
-              // Handle button clicks from interactive messages
-              const selectedButtonId = msg.message.buttonsResponseMessage.selectedButtonId;
+          
+let body = '';
+const messageType = Object.keys(msg.message || {})[0];
 
-              // Check if it's a command button (starts with prefix)
-              if (selectedButtonId && selectedButtonId.startsWith(COMMAND_PREFIX)) {
-                // Treat button click as a command
-                body = selectedButtonId;
-                console.log(color(`[BUTTON] ${senderNumber}: ${body}`, 'cyan'));
-                break; // Continue to command processing
-              }
+// ===============================
+// PROTOCOL (ANTI-DELETE / REVOKE)
+// ===============================
+if (messageType === 'protocolMessage') {
+  // type === 0 => message revoke/delete
+  if (msg.message.protocolMessage?.type === 0) {
+    await handleMessageRevocation(sock, msg);
+  }
+  return; // Skip protocol messages after handling
+}
 
-              // Handle predefined button responses
-              if (buttonResponses[selectedButtonId]) {
-                const response = buttonResponses[selectedButtonId];
-                try {
-                  if (response.contact) {
-                    // Send contact card
-                    await sock.sendMessage(remoteJid, {
-                      contacts: {
-                        displayName: response.contact.name,
-                        contacts: [{
-                          vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${response.contact.name}\nTEL:${response.contact.phone}\nEND:VCARD`
-                        }]
-                      }
-                    }, { quoted: msg });
-                  } else {
-                    // Send text response
-                    await sock.sendMessage(remoteJid, {
-                      text: response.text
-                    }, { quoted: msg });
-                  }
-                } catch (error) {
-                  console.log(`[ERROR] Failed to send button response: ${error.message}`);
-                }
-              }
-              return; // Don't process as regular command
-            case 'interactiveResponseMessage':
-              // Handle new interactive message button clicks
-              const nativeFlowResponse = msg.message.interactiveResponseMessage?.nativeFlowResponseMessge?.paramsJson;
-              if (nativeFlowResponse) {
-                try {
-                  const params = JSON.parse(nativeFlowResponse);
-                  const buttonId = params.id;
+// ===============================
+// BODY EXTRACTOR (FIXED)
+// Supports: text, captions, buttons, lists, template buttons, interactive native flow
+// ===============================
+switch (messageType) {
+  case 'conversation':
+    body = msg.message.conversation || '';
+    break;
 
-                  // Check if it's a command button (starts with prefix)
-                  if (buttonId && buttonId.startsWith(COMMAND_PREFIX)) {
-                    // Treat button click as a command
-                    body = buttonId;
-                    console.log(color(`[INTERACTIVE] ${senderNumber}: ${body}`, 'cyan'));
-                    break; // Continue to command processing
-                  }
-                } catch (parseError) {
-                  console.log(`[ERROR] Failed to parse interactive response: ${parseError.message}`);
-                }
-              }
-              return; // Don't process as regular command
-            case 'listResponseMessage':
-              // Handle list selection clicks  
-              const selectedRowId = msg.message.listResponseMessage.singleSelectReply.selectedRowId;
+  case 'extendedTextMessage':
+    body = msg.message.extendedTextMessage?.text || '';
+    break;
 
-              // Check if it's a command button (starts with prefix)
-              if (selectedRowId && selectedRowId.startsWith(COMMAND_PREFIX)) {
-                // Treat list selection as a command
-                body = selectedRowId;
-                console.log(color(`[LIST] ${senderNumber}: ${body}`, 'cyan'));
-                break; // Continue to command processing
-              }
-              return; // Don't process as regular command
-            default:
-              console.log(`[INFO] Skipping unsupported message type: ${messageType}`);
-              return;
-          }
+  case 'imageMessage':
+    body = msg.message.imageMessage?.caption || '';
+    break;
 
-          // ===============================
-          // QUICK REPLY ROUTER (NO PREFIX)
-          // Handles: 1 / 2 for play+video sessions, and "next" for menu
-          // ===============================
+  case 'videoMessage':
+    body = msg.message.videoMessage?.caption || '';
+    break;
 
-          const replyBody =
-            (msg.message?.conversation ||
-              msg.message?.extendedTextMessage?.text ||
-              msg.message?.imageMessage?.caption ||
-              msg.message?.videoMessage?.caption ||
-              msg.message?.documentMessage?.caption ||
-              "").trim();
+  case 'documentMessage':
+    body = msg.message.documentMessage?.caption || '';
+    break;
 
-          const quotedMsg2 = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-          const quotedText2 = (
-            quotedMsg2?.conversation ||
-            quotedMsg2?.extendedTextMessage?.text ||
-            quotedMsg2?.imageMessage?.caption ||
-            quotedMsg2?.videoMessage?.caption ||
-            quotedMsg2?.documentMessage?.caption ||
-            ""
-          ).trim();
+  case 'newsletterAdminInviteMessage':
+    body = msg.message.newsletterAdminInviteMessage?.text || '';
+    break;
 
-          if (replyBody && !replyBody.startsWith(COMMAND_PREFIX)) {
-            const lower = replyBody.toLowerCase();
+  case 'messageContextInfo':
+    // Handle newsletter forwarded messages
+    body =
+      msg.message.messageContextInfo?.extendedTextMessage?.text ||
+      msg.message.messageContextInfo?.conversation ||
+      '';
+    break;
 
-            // ✅ safe settings (prevents ReferenceError)
-            const safeSettings =
-              (typeof settings !== "undefined" && settings) ||
-              global.settings ||
-              globalThis.settings ||
-              {};
+  case 'buttonsResponseMessage': {
+    // Normal buttons
+    const selectedButtonId =
+      msg.message.buttonsResponseMessage?.selectedButtonId ||
+      msg.message.buttonsResponseMessage?.selectedDisplayText ||
+      '';
 
-            // ---- A) NEXT for menu pagination ----
-            if (lower === "next") {
-              // optional safety: only when replying to a menu
-              const looksLikeMenu =
-                !quotedMsg2 || // allow plain "next" too
-                quotedText2.includes('Reply with "next"') ||
-                quotedText2.toLowerCase().includes("reply") ||
-                quotedText2.toLowerCase().includes("next");
+    body = selectedButtonId || '';
+    break;
+  }
 
-              if (looksLikeMenu) {
-                const menuCmd =
-                  commands.get("menu") ||
-                  commands.get("help") ||
-                  commands.get("commands") ||
-                  null;
+  case 'templateButtonReplyMessage': {
+    // Template buttons
+    const selectedId =
+      msg.message.templateButtonReplyMessage?.selectedId ||
+      msg.message.templateButtonReplyMessage?.selectedDisplayText ||
+      '';
 
-                if (menuCmd?.execute) {
-                  await menuCmd.execute(msg, { sock, args: ["next"], settings: safeSettings });
-                  return;
-                }
-              }
-            }
+    body = selectedId || '';
+    break;
+  }
 
-            // ---- B) 1/2 for selection-based commands (play/video) ----
-            if (replyBody === "1" || replyBody === "2") {
-              const playCmd = commands.get("play");
-              const videoCmd = commands.get("video");
+  case 'listResponseMessage': {
+    // List replies
+    const rowId =
+      msg.message.listResponseMessage?.singleSelectReply?.selectedRowId ||
+      msg.message.listResponseMessage?.title ||
+      '';
 
-              if (playCmd?.onReply) {
-                const handled = await playCmd.onReply(msg, sock);
-                if (handled) return;
-              }
+    body = rowId || '';
+    break;
+  }
 
-              if (videoCmd?.onReply) {
-                const handled = await videoCmd.onReply(msg, sock);
-                if (handled) return;
-              }
-            }
-          }
+  case 'interactiveResponseMessage': {
+    // Native flow / interactive replies often return paramsJson string
+    const paramsJson =
+      msg.message.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ||
+      '';
 
-          // ===============================
-          // END QUICK REPLY ROUTER
-          // ===============================
+    body = paramsJson || '';
+    break;
+  }
+
+  default:
+    body = '';
+    break;
+}
+
+// ===============================
+// NORMALIZE interactive paramsJson into actual selection id
+// ===============================
+let normalizedBody = (body || '').trim();
+try {
+  if (normalizedBody.startsWith('{') && normalizedBody.includes('"id"')) {
+    const j = JSON.parse(normalizedBody);
+    if (j?.id) normalizedBody = String(j.id).trim();
+  }
+} catch {}
+
+body = normalizedBody;
+
+// ===============================
+// MENU BUTTON RESPONSES (non-command)
+// If a button click matches a predefined response and it's NOT a command, reply and stop.
+// ===============================
+if (messageType === 'buttonsResponseMessage') {
+  const selectedButtonId =
+    msg.message.buttonsResponseMessage?.selectedButtonId ||
+    msg.message.buttonsResponseMessage?.selectedDisplayText ||
+    '';
+
+  if (
+    selectedButtonId &&
+    !selectedButtonId.startsWith(COMMAND_PREFIX) &&
+    buttonResponses?.[selectedButtonId]
+  ) {
+    const response = buttonResponses[selectedButtonId];
+    try {
+      if (response?.contact) {
+        await sock.sendMessage(
+          remoteJid,
+          {
+            contacts: {
+              displayName: response.contact.name,
+              contacts: [
+                {
+                  vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${response.contact.name}\nTEL:${response.contact.phone}\nEND:VCARD`,
+                },
+              ],
+            },
+          },
+          { quoted: msg }
+        );
+      } else if (response?.text) {
+        await sock.sendMessage(
+          remoteJid,
+          { text: response.text },
+          { quoted: msg }
+        );
+      }
+    } catch (error) {
+      console.log(`[ERROR] Failed to send button response: ${error.message}`);
+    }
+    return; // Don't process as regular command
+  }
+}
+
+// From here onward, msg.body will be used by the command system
+// Handle direct replies to menu/selections (no prefix)
+
+// ===============================
+// QUICK REPLY ROUTER (NO PREFIX)
+// Handles: 1 / 2 for play+video sessions, and "next" for menu
+// ===============================
+
+const replyBody = (
+  msg.message?.conversation ||
+  msg.message?.extendedTextMessage?.text ||
+  msg.message?.imageMessage?.caption ||
+  msg.message?.videoMessage?.caption ||
+  msg.message?.documentMessage?.caption ||
+
+  // ✅ NEW: template button reply
+  msg.message?.templateButtonReplyMessage?.selectedId ||
+  msg.message?.templateButtonReplyMessage?.selectedDisplayText ||
+
+  // ✅ NEW: normal buttons reply
+  msg.message?.buttonsResponseMessage?.selectedButtonId ||
+  msg.message?.buttonsResponseMessage?.selectedDisplayText ||
+
+  // ✅ NEW: list reply
+  msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+  msg.message?.listResponseMessage?.title ||
+
+  // ✅ NEW: interactive native flow reply
+  msg.message?.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson ||
+
+  ""
+).trim();
+            let normalizedReplyBody = replyBody;
+try {
+  if (replyBody.startsWith("{") && replyBody.includes("id")) {
+    const j = JSON.parse(replyBody);
+    if (j.id) normalizedReplyBody = j.id;
+  }
+} catch {}
+
+const quotedMsg2 = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+
+const quotedText2 = (
+  quotedMsg2?.conversation ||
+  quotedMsg2?.extendedTextMessage?.text ||
+  quotedMsg2?.imageMessage?.caption ||
+  quotedMsg2?.videoMessage?.caption ||
+  quotedMsg2?.documentMessage?.caption ||
+  quotedMsg2?.templateButtonReplyMessage?.selectedId ||
+  quotedMsg2?.buttonsResponseMessage?.selectedButtonId ||
+  quotedMsg2?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+  ""
+).trim();
+
+if (normalizedReplyBody && !normalizedReplyBody.startsWith(COMMAND_PREFIX)) {
+  const lower = normalizedReplyBody.toLowerCase();
+
+  // ✅ safe settings (prevents ReferenceError)
+  const safeSettings =
+    (typeof settings !== "undefined" && settings) ||
+    global.settings ||
+    globalThis.settings ||
+    {};
+
+  // ---- A) NEXT for menu pagination ----
+  if (lower === "next") {
+    // optional safety: only when replying to a menu
+    const looksLikeMenu =
+      !quotedMsg2 || // allow plain "next" too
+      quotedText2.includes('Reply with "next"') ||
+      quotedText2.toLowerCase().includes("reply") ||
+      quotedText2.toLowerCase().includes("next");
+
+    if (looksLikeMenu) {
+      const menuCmd =
+        commands.get("menu") ||
+        commands.get("help") ||
+        commands.get("commands") ||
+        null;
+
+      if (menuCmd?.execute) {
+        await menuCmd.execute(msg, { sock, args: ["next"], settings: safeSettings });
+        return;
+      }
+    }
+  }
+
+  // ---- B) 1/2 for selection-based commands (play/video) ----
+  if (normalizedReplyBody === "1" || normalizedReplyBody === "2") {
+    const playCmd = commands.get("play");
+    const videoCmd = commands.get("video");
+
+    if (playCmd?.onReply) {
+      const handled = await playCmd.onReply(msg, sock);
+      if (handled) return;
+    }
+
+    if (videoCmd?.onReply) {
+      const handled = await videoCmd.onReply(msg, sock);
+      if (handled) return;
+    }
+  }
+}
+
+// ===============================
+// END QUICK REPLY ROUTER
+// ===============================
+ 
+
           // Attach body to msg object for commands that need it
           msg.body = body;
 

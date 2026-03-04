@@ -1,95 +1,175 @@
 import axios from "axios";
-import fs from "fs";
-import path from "path";
+import {
+proto,
+generateWAMessageFromContent,
+prepareWAMessageMedia
+} from "@whiskeysockets/baileys";
 
-const emojis = JSON.parse(
-    fs.readFileSync(path.join(process.cwd(), "data", "emojis.json"), "utf8")
-);
-
-const sessions = new Map();
+global.movieSubCache = global.movieSubCache || {};
 
 export default {
-    name: "movie",
-    description: "Search and download movies/series",
-    category: "Youtube, Movies & Series Downloader",
-    aliases: ["series", "film"],
+name: "movie",
+aliases: ["sm","silent"],
+category: "download",
+description: "Search movies",
 
-    async execute(msg, { sock, args }) {
-        const from = msg.key.remoteJid;
-        let input = args.join(" ").trim();
-        const bodyText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
+async execute(m,{sock,args,settings}){
 
-        if (sessions.has(from) && !isNaN(bodyText)) {
-            const session = sessions.get(from);
-            const index = parseInt(bodyText) - 1;
-            const episode = session.episodes[index];
-            
-            if (!episode) return sock.sendMessage(from, { text: "❌ Invalid episode number." });
-            
-            sessions.delete(from);
-            await sock.sendMessage(from, { react: { text: emojis.processing, key: msg.key } });
-            
-            try {
-                const videoUrl = "https://example.com/movie.mp4"; // Placeholder for real API link
-                
-                // Try sending as video first
-                try {
-                    await sock.sendMessage(from, {
-                        video: { url: videoUrl },
-                        caption: `🎬 *${episode.title}*\n\n> ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝔼𝕔𝕝𝕚𝕡𝕤𝕖 𝕄𝔻`
-                    }, { quoted: msg });
-                } catch (e) {
-                    // Fallback to document if too large or fails
-                    await sock.sendMessage(from, {
-                        document: { url: videoUrl },
-                        mimetype: "video/mp4",
-                        fileName: `${episode.title}.mp4`,
-                        caption: `🎬 *${episode.title}*\n\n_Note: Sent as document due to size/compatibility_`
-                    }, { quoted: msg });
-                }
-                
-                await sock.sendMessage(from, { react: { text: emojis.success, key: msg.key } });
-            } catch (err) {
-                await sock.sendMessage(from, { text: "❌ Download failed." });
-            }
-            return;
-        }
+const from = m.key.remoteJid
+const PREFIX = settings?.prefix || "."
+const query = args.join(" ")
 
-        if (!input) {
-            return sock.sendMessage(from, { text: "❌ *Provide movie/series name to search.*" });
-        }
+const reply = (text)=>sock.sendMessage(from,{text},{quoted:m})
 
-        await sock.sendMessage(from, { react: { text: emojis.processing, key: msg.key } });
+if(!query)
+return reply(`🎬 Usage:\n${PREFIX}movie <movie name>`)
 
-        try {
-            // Simulated search result with all episodes
-            const movieData = {
-                title: input,
-                thumbnail: "https://files.catbox.moe/vsxdpj.jpg",
-                episodes: [
-                    { title: `${input} - Episode 1` },
-                    { title: `${input} - Episode 2` },
-                    { title: `${input} - Episode 3` },
-                    { title: `${input} - Episode 4` },
-                    { title: `${input} - Episode 5` }
-                ]
-            };
+await sock.sendMessage(from,{react:{text:"🔎",key:m.key}})
 
-            sessions.set(from, { episodes: movieData.episodes });
+try{
 
-            let listText = `🎬 *${movieData.title}*\n\n`;
-            movieData.episodes.forEach((epi, i) => {
-                listText += `${i + 1}️⃣ ${epi.title}\n`;
-            });
-            listText += `\n*Reply with the episode number to download.*`;
+const {data} = await axios.get(
+"https://darkvibe314-silent-movies-api.hf.space/api/search",
+{params:{query}}
+)
 
-            await sock.sendMessage(from, { 
-                image: { url: movieData.thumbnail },
-                caption: listText 
-            }, { quoted: msg });
+if(!data?.results?.length)
+return reply("❌ No movies found.")
 
-        } catch (err) {
-            await sock.sendMessage(from, { text: "❌ Movie search failed." });
-        }
-    }
-};
+const results = data.results.slice(0,5)
+const cards = []
+
+for(const movie of results){
+
+const title = (movie.title || "Unknown").slice(0,50)
+const isSeries = movie.subjectType === 2
+
+global.movieSubCache[movie.subjectId] =
+movie.subtitles || "None"
+
+const subText = movie.subtitles
+? movie.subtitles.split(",").slice(0,3).join(", ")+"..."
+: "None"
+
+const desc =
+`⭐ IMDb: ${movie.imdbRatingValue || "N/A"}
+🎭 Genre: ${movie.genre || "N/A"}
+📅 Year: ${movie.releaseDate?.split("-")[0] || "Unknown"}
+📌 Type: ${isSeries ? "Series 📺":"Movie 🎬"}
+💬 Subs: ${subText}`
+
+const cover =
+movie.cover?.url ||
+"https://i.ibb.co/99KrSHn2/c4cd381ffed6.jpg"
+
+const media = await prepareWAMessageMedia(
+{image:{url:cover}},
+{upload:sock.waUploadToServer}
+)
+
+let buttons = []
+
+if(isSeries){
+
+buttons.push({
+name:"quick_reply",
+buttonParamsJson:JSON.stringify({
+display_text:"📺 Download",
+id:`${PREFIX}dlmovie ${movie.subjectId} 1 1`
+})
+})
+
+buttons.push({
+name:"quick_reply",
+buttonParamsJson:JSON.stringify({
+display_text:"📝 Subtitles",
+id:`${PREFIX}smsubs ${movie.subjectId} 1 1`
+})
+})
+
+}else{
+
+buttons.push({
+name:"quick_reply",
+buttonParamsJson:JSON.stringify({
+display_text:"🎬 Download",
+id:`${PREFIX}dlmovie ${movie.subjectId} null null`
+})
+})
+
+buttons.push({
+name:"quick_reply",
+buttonParamsJson:JSON.stringify({
+display_text:"📝 Subtitles",
+id:`${PREFIX}smsubs ${movie.subjectId} null null`
+})
+})
+
+}
+
+cards.push({
+body: proto.Message.InteractiveMessage.Body.create({
+text: desc
+}),
+header: proto.Message.InteractiveMessage.Header.create({
+title:`🎬 ${title}`,
+hasMediaAttachment:true,
+imageMessage:media.imageMessage
+}),
+nativeFlowMessage:
+proto.Message.InteractiveMessage.NativeFlowMessage.create({
+buttons
+})
+})
+
+}
+
+const interactiveMessage =
+proto.Message.InteractiveMessage.create({
+
+body: proto.Message.InteractiveMessage.Body.create({
+text:`🎥 Results for: ${query}\nSwipe ➡️`
+}),
+
+carouselMessage:
+proto.Message.InteractiveMessage.CarouselMessage.create({
+cards,
+messageVersion:1
+})
+
+})
+
+const outMsg = generateWAMessageFromContent(
+from,
+{
+viewOnceMessage:{
+message:{
+messageContextInfo:{
+deviceListMetadata:{},
+deviceListMetadataVersion:2
+},
+interactiveMessage
+}
+}
+},
+{quoted:m}
+)
+
+await sock.relayMessage(from,outMsg.message,{
+messageId: outMsg.key.id
+})
+
+await sock.sendMessage(from,{
+react:{text:"✅",key:m.key}
+})
+
+}catch(e){
+
+console.log("[MOVIE ERROR]",e)
+
+reply("❌ Movie search failed.")
+
+}
+
+}
+}
