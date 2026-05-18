@@ -15,51 +15,37 @@ export default {
     const from = msg.key.remoteJid;
 
     try {
-      await sock.sendMessage(from, {
-        react: { text: '🌹', key: msg.key }
-      });
+      await sock.sendMessage(from, { react: { text: '🌹', key: msg.key } });
 
-      let data;
+      let message = '';
       try {
-        const response = await axios.get('https://shizoapi.onrender.com/api/texts/roseday?apikey=shizo', {
-          timeout: 15000
-        });
-        data = response.data;
-      } catch (apiError) {
-        // Fallback messages if API is down
-        const fallbackMessages = [
+        const res = await axios.get('https://api.princetechn.com/api/fun/roseday?apikey=prince', { timeout: 10000 });
+        if (res.data?.success && res.data?.result) {
+          message = res.data.result;
+        }
+      } catch {}
+
+      if (!message) {
+        const fallback = [
           "A rose speaks of love silently, in a language known only to the heart. 🌹",
           "Red roses for a red love. You're the love of my life! 🌹❤️",
-          "Flowers are the sweetest things that God ever made and forgot to put a soul into. 🌹",
           "A single rose can be my garden... a single friend, my world. 🌹",
-          "I'd rather have roses on my table than diamonds on my neck. 🌹💎"
+          "I'd rather have roses on my table than diamonds on my neck. 🌹💎",
+          "You don't meet every day, but I remember you every day. 🌹"
         ];
-        data = { result: fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)] };
+        message = fallback[Math.floor(Math.random() * fallback.length)];
       }
 
-      if (!data || !data.result) {
-        throw new Error('Invalid response from API');
-      }
+      const text = `🌹 *Happy Rose Day* 🌹\n\n${message}\n\n━━━━━━━━━━━━━━━━━━\n💖 _Spread love with Eclipse MD_`;
 
-      const roseDayText = `🌹 *Happy Rose Day* 🌹\n\n${data.result}\n\n━━━━━━━━━━━━━━━━━━\n💖 _Spread love with Eclipse MD_`;
-
-      await sock.sendMessage(from, {
-        text: roseDayText
-      }, { quoted: msg });
-
-      await sock.sendMessage(from, {
-        react: { text: emojis.success || '✅', key: msg.key }
-      });
+      await sock.sendMessage(from, { text }, { quoted: msg });
+      await sock.sendMessage(from, { react: { text: emojis.success || '✅', key: msg.key } });
 
     } catch (error) {
       console.error('Error in roseday command:', error);
-      
+      await sock.sendMessage(from, { react: { text: emojis.error || '❌', key: msg.key } });
       await sock.sendMessage(from, {
-        react: { text: emojis.error || '❌', key: msg.key }
-      });
-
-      await sock.sendMessage(from, {
-        text: `${emojis.error || '❌'} Failed to fetch Rose Day message. Please try again later.\n\n🛠️ Error: ${error.message}`
+        text: `${emojis.error || '❌'} Failed to fetch Rose Day message. Please try again later.`
       }, { quoted: msg });
     }
   }

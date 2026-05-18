@@ -421,14 +421,18 @@ INSTRUCTIONS:
 Your response:
         `.trim();
 
-        const response = await fetch("https://api.dreaded.site/api/chatgpt?text=" + encodeURIComponent(prompt));
-        if (!response.ok) throw new Error("API call failed");
-
-        const data = await response.json();
-        if (!data.success || !data.result?.prompt) throw new Error("Invalid API response");
+        const encodedPrompt = encodeURIComponent(prompt);
+        const seed = Math.floor(Math.random() * 99999);
+        const aiRes = await fetch(
+          `https://text.pollinations.ai/${encodedPrompt}?model=openai&seed=${seed}`,
+          { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/plain' } }
+        );
+        if (!aiRes.ok) throw new Error("API call failed");
+        const rawText = await aiRes.text();
+        if (!rawText || rawText.trim().length === 0) throw new Error("Invalid API response");
 
         // Clean up the response
-        let cleanedResponse = data.result.prompt.trim()
+        let cleanedResponse = rawText.trim()
             .replace(/winks/g, '😉')
             .replace(/eye roll/g, '🙄')
             .replace(/shrug/g, '🤷‍♂️')

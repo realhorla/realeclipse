@@ -55,19 +55,23 @@ function logNetworkError(prefix, error) {
     }
 }
 
-// Music API client
+// Music API client — uses savetube.me via musicDownloader below
 const musicApi = {
-    base: 'https://api.princetechn.com/api/download/ytmp3',
-    apikey: process.env.PRINCE_API_KEY || 'prince',
     async getMusicData(videoUrl) {
-        const params = new URLSearchParams({ apikey: this.apikey, url: videoUrl });
-        const url = `${this.base}?${params.toString()}`;
-        
-        const { data } = await axios.get(url, {
-            timeout: 20000,
-            headers: { 'user-agent': 'Mozilla/5.0', accept: 'application/json' }
-        });
-        return data;
+        const result = await musicDownloader.downloadMusic(videoUrl, 'mp3');
+        if (result?.status && result?.result?.download) {
+            return {
+                success: true,
+                result: {
+                    title: result.result.title,
+                    download_url: result.result.download,
+                    thumbnail: result.result.thumbnail,
+                    quality: result.result.quality,
+                    id: result.result.id
+                }
+            };
+        }
+        throw new Error('savetube download failed');
     }
 };
 

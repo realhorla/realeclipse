@@ -178,20 +178,16 @@ async function handleReactionCommand(reaction, msg, sock, settings) {
     
     if (!gifUrl) {
       try {
-        console.log(`[REACTION] Trying prexzyvilla API for ${reaction}...`);
-        const prexzyResponse = await axios.get(`https://apis.prexzyvilla.site/anime/${reaction}`, {
-          timeout: 20000,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-        
-        if (prexzyResponse.data && prexzyResponse.data.status && prexzyResponse.data.result) {
-          gifUrl = prexzyResponse.data.result;
-          console.log(`[REACTION] prexzyvilla returned URL: ${gifUrl}`);
+        const tenorResponse = await axios.get(
+          `https://g.tenor.com/v1/search?q=${encodeURIComponent(reaction + ' anime')}&limit=8&key=LIVDSRZULELA`,
+          { timeout: 10000 }
+        );
+        if (tenorResponse.data?.results?.length > 0) {
+          const pick = tenorResponse.data.results[Math.floor(Math.random() * tenorResponse.data.results.length)];
+          gifUrl = pick.media?.[0]?.gif?.url || pick.media?.[0]?.mediumgif?.url;
         }
       } catch (e) {
-        console.log(`[REACTION] prexzy API failed for ${reaction}:`, e.message);
+        console.log(`[REACTION] Tenor API failed for ${reaction}:`, e.message);
       }
     }
     
@@ -229,23 +225,27 @@ async function handleSpecialAI(endpoint, msg, sock, args, settings, paramName = 
       text: `🤖 Processing your request... Please wait!`
     }, { quoted: msg });
     
-    const response = await axios.get(`https://apis.prexzyvilla.site/ai/${endpoint}`, {
-      params: { [paramName]: prompt },
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json'
-      },
-      timeout: 60000
-    });
+    const systemPrompts = {
+      'dream':  'You are a professional dream interpreter and psychologist. Deeply analyze and interpret the dream with psychological, symbolic, and spiritual meanings. Be detailed and insightful.',
+      'quick':  'You are a creative storytelling AI. Create an engaging, vivid, and imaginative short story based on the given topic. Make it compelling with a clear beginning, middle, and end.',
+    };
     
-    let result = '';
-    if (response.data?.status === true) {
-      result = response.data.result || response.data.text || response.data.reply || 
-               response.data.data?.result || response.data.data?.text || 
-               JSON.stringify(response.data.data || response.data);
-    } else {
-      throw new Error(response.data?.error || 'Failed to get response');
-    }
+    const systemPrompt = systemPrompts[endpoint] || `You are a helpful AI assistant. Help with the following request related to "${endpoint}".`;
+    const fullPrompt = `${systemPrompt}\n\n${prompt}`;
+    const encodedPrompt = encodeURIComponent(fullPrompt);
+    const seed = Math.floor(Math.random() * 99999);
+    
+    const response = await axios.get(
+      `https://text.pollinations.ai/${encodedPrompt}?model=openai&seed=${seed}`,
+      {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/plain, */*' },
+        timeout: 60000,
+        responseType: 'text'
+      }
+    );
+    
+    const result = typeof response.data === 'string' ? response.data.trim() : String(response.data || '').trim();
+    if (!result) throw new Error('Empty response from AI');
     
     await sock.sendMessage(from, {
       text: `🤖 *Result:*\n\n${result}`

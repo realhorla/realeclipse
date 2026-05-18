@@ -2,54 +2,45 @@ import axios from 'axios';
 
 export default {
   name: 'copilot',
-  description: 'Ask Copilot AI a question',
-  async execute(msg, { sock, args }) {
-    const dest = msg.key.remoteJid;
+  description: 'Ask Microsoft Copilot AI a question',
+  aliases: ['mscopilot1'],
+  async execute(msg, { sock, args, settings }) {
+    const from = msg.key.remoteJid;
     const prompt = args.join(' ');
 
     if (!prompt) {
-      return await sock.sendMessage(dest, {
-        text: '❌ Please provide a prompt.\n\nExample: ?copilot Hello AI!',
+      return await sock.sendMessage(from, {
+        text: `❓ Please provide a prompt.\n\nUsage: ${settings.prefix}copilot <your question>`
       }, { quoted: msg });
     }
 
     try {
-      // Using the same API as gpt4.js for consistency
-      async function SupunAi(text) {
-        const response = await axios.post("https://chatgptforpro.onrender.com/", {
-          message: text,
-          model: "gpt-4"
-        }, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-          }
-        });
-        return response.data;
-      }
+      await sock.sendMessage(from, { text: '🤖 Copilot is thinking... Please wait!' }, { quoted: msg });
 
-      const result = await SupunAi(prompt);
-      
-      if (result && result.length > 0) {
-        await sock.sendMessage(dest, {
-          text: `🤖 *Copilot Response:*\n\n${result}`,
-        }, { quoted: msg });
-      } else {
-        throw new Error('Empty response from Copilot');
-      }
+      const encodedPrompt = encodeURIComponent(prompt);
+      const seed = Math.floor(Math.random() * 99999);
+      const response = await axios.get(
+        `https://text.pollinations.ai/${encodedPrompt}?model=openai&seed=${seed}`,
+        {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/plain, */*' },
+          timeout: 60000,
+          responseType: 'text'
+        }
+      );
+
+      const reply = typeof response.data === 'string' ? response.data.trim() : String(response.data).trim();
+      if (!reply) throw new Error('Empty response');
+
+      await sock.sendMessage(from, {
+        text: `🤖 *Copilot Response:*\n\n${reply}`
+      }, { quoted: msg });
 
     } catch (error) {
-      console.error('[Copilot Error]', error);
-      let errorMessage = '❌ Sorry, Copilot is currently unavailable. Please try again later.';
-      
-      if (error.response?.status === 429) {
-        errorMessage = '❌ Copilot is busy. Please try again in a few minutes.';
-      } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-        errorMessage = '❌ Copilot service is currently down. Please try again later.';
-      } else if (error.response?.status === 400) {
-        errorMessage = '❌ Invalid request. Please try with different text.';
-      }
-      
-      await sock.sendMessage(dest, { text: errorMessage }, { quoted: msg });
+      console.error('[Copilot Error]', error.message);
+      let errorMsg = '❌ Copilot is currently unavailable. Please try again later.';
+      if (error.response?.status === 429) errorMsg = '❌ Copilot is busy. Please try again in a moment.';
+      else if (error.code === 'ETIMEDOUT') errorMsg = '⏰ Request timed out. Please try again.';
+      await sock.sendMessage(from, { text: errorMsg }, { quoted: msg });
     }
   }
 };

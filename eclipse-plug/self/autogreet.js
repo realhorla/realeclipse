@@ -244,9 +244,9 @@ export async function checkAutoGreetings(sock) {
             let morningMessage = '';
             
             try {
-                const res = await axios.get('https://shizoapi.onrender.com/api/texts/goodmorning?apikey=shizo');
-                if (res.data && res.data.result) {
-                    morningMessage = res.data.result;
+                const res = await axios.get('https://api.princetechn.com/api/fun/motivation?apikey=prince', { timeout: 10000 });
+                if (res.data?.success && res.data?.result) {
+                    morningMessage = `☀️ *Good Morning!* ☀️\n\n${res.data.result}\n\n🌅 _Have a blessed day!_`;
                 }
             } catch (apiError) {
                 const defaultMessages = [
@@ -268,9 +268,9 @@ export async function checkAutoGreetings(sock) {
             let nightMessage = '';
             
             try {
-                const res = await axios.get('https://shizoapi.onrender.com/api/texts/lovenight?apikey=shizo');
-                if (res.data && res.data.result) {
-                    nightMessage = res.data.result;
+                const res = await axios.get('https://api.princetechn.com/api/fun/goodnight?apikey=prince', { timeout: 10000 });
+                if (res.data?.success && res.data?.result) {
+                    nightMessage = `🌙 *Good Night!* 🌙\n\n${res.data.result}\n\n✨ _Sweet dreams!_`;
                 }
             } catch (apiError) {
                 const defaultMessages = [
