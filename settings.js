@@ -1,19 +1,10 @@
 export default {
-  // OpenAI API configuration
-  openaiApiKey: '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',
-
-  // Giphy API configuration
-  giphyApiKey: '',
-  // Gemini API configuration
-  geminiApiKey: 'AIzaSyBUCZp1sNUAL3qy_2k0I_TebhXSjArCYoI',
-  // Imgur API configuration
-  imgurClientId: '',
-  // Copilot API configuration
-  copilotApiKey: '',
-  // Football API configuration
-  FOOTBALL_API_KEY: '',
-
-  // Mega.nz credentials for auth storage
-  megaEmail: 'olamilekanidowu998@gmail.com',
-  megaPassword: 'Omotoyosi',
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
+  giphyApiKey: process.env.GIPHY_API_KEY || '',
+  geminiApiKey: process.env.GEMINI_API_KEY || '',
+  imgurClientId: process.env.IMGUR_CLIENT_ID || '',
+  copilotApiKey: process.env.COPILOT_API_KEY || '',
+  FOOTBALL_API_KEY: process.env.FOOTBALL_API_KEY || '',
+  megaEmail: process.env.MEGA_EMAIL || '',
+  megaPassword: process.env.MEGA_PASSWORD || '',
 };
