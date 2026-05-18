@@ -35,7 +35,16 @@ if (TEST_MODE) {
 
 // Import config to get the prefix
 import config from './config.js';
-const COMMAND_PREFIX = process.env.BOT_PREFIX || config.prefix;
+// Load saved prefix from persistent settings if available (fs is already imported above)
+let _persistedPrefix = '';
+try {
+  const _settingsPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'botSettings.json');
+  if (fs.existsSync(_settingsPath)) {
+    const _settingsData = JSON.parse(fs.readFileSync(_settingsPath, 'utf8'));
+    _persistedPrefix = _settingsData.prefix || '';
+  }
+} catch {}
+let COMMAND_PREFIX = _persistedPrefix || process.env.BOT_PREFIX || config.prefix;
 
 // Make config globally accessible
 global.config = {
@@ -371,6 +380,14 @@ global.commands = new Map();
 global.selfCommands = new Map();
 const commands = global.commands;
 const selfCommands = global.selfCommands;
+
+// Pre-import modules used in hot message loop to avoid per-message dynamic import overhead
+let channelConfigModule = null;
+let antitag = null;
+let antimention = null;
+try { channelConfigModule = await import('./lib/channelConfig.js'); } catch (e) { console.log(color('[WARN] channelConfig not loaded', 'yellow')); }
+try { antitag = await import('./eclipse-plug/antitag.js'); } catch (e) { console.log(color('[WARN] antitag not loaded', 'yellow')); }
+try { antimention = await import('./eclipse-plug/antimention.js'); } catch (e) { console.log(color('[WARN] antimention not loaded', 'yellow')); }
 
 // Import chatbot handler
 let chatbotHandler = null;
@@ -719,12 +736,13 @@ async function startBot() {
       generateHighQualityLinkPreview: false,
       syncFullHistory: false,
       printQRInTerminal: false,
-      connectTimeoutMs: 60000,
-      keepAliveIntervalMs: 30000,
-      defaultQueryTimeoutMs: 60000,
-      retryRequestDelayMs: 1000,
-      maxMsgRetryCount: 2,
-      markOnlineOnConnect: false,
+      connectTimeoutMs: 30000,
+      keepAliveIntervalMs: 10000,
+      defaultQueryTimeoutMs: 30000,
+      retryRequestDelayMs: 500,
+      maxMsgRetryCount: 3,
+      markOnlineOnConnect: true,
+      getMessage: async () => ({ conversation: '' }),
     });
 
 
@@ -852,7 +870,7 @@ Type ${botPrefix}menu to see all your obsession commands
         // Auto-follow newsletter channel on startup with retry logic
         setTimeout(async () => {
           try {
-            const { NEWSLETTER_JID } = await import('./lib/channelConfig.js');
+            const { NEWSLETTER_JID } = channelConfigModule || {};
             // console.log(color('[NEWSLETTER] Attempting to follow channel: ' + NEWSLETTER_JID, 'cyan'));
             
             // Retry logic - try up to 3 times with delays
@@ -1131,9 +1149,14 @@ Type ${botPrefix}menu to see all your obsession commands
           const isGroup = remoteJid.endsWith('@g.us');
           const isNewsletter = remoteJid.endsWith('@newsletter');
 
-          // Import newsletter config for consistency
-          const { NEWSLETTER_CHANNEL } = await import('./lib/channelConfig.js');
+          // Use pre-imported newsletter config
+          const NEWSLETTER_CHANNEL = channelConfigModule?.NEWSLETTER_CHANNEL || '';
           const isTargetNewsletter = remoteJid === NEWSLETTER_CHANNEL;
+          
+          // Sync prefix in case it was changed at runtime via changeprefix command
+          if (global.COMMAND_PREFIX && global.COMMAND_PREFIX !== COMMAND_PREFIX) {
+            COMMAND_PREFIX = global.COMMAND_PREFIX;
+          }
           
           // Handle sender JID - newsletters may not have participant
           let senderJid;
@@ -1430,20 +1453,22 @@ if (normalizedReplyBody && !normalizedReplyBody.startsWith(COMMAND_PREFIX)) {
 
           // Anti-detection for groups using proper antilink system
           if (isGroup && !isNewsletter && !isFromMe) {
-            // Use antitag detection
-            try {
-              const antitag = await import('./eclipse-plug/antitag.js');
-              await antitag.default.onMessage(msg, { sock });
-            } catch (err) {
-              console.log('[WARN] Antitag error:', err.message);
+            // Use pre-imported antitag detection
+            if (antitag?.default?.onMessage) {
+              try {
+                await antitag.default.onMessage(msg, { sock });
+              } catch (err) {
+                console.log('[WARN] Antitag error:', err.message);
+              }
             }
 
-            // Use antimention detection
-            try {
-              const antimention = await import('./eclipse-plug/antimention.js');
-              await antimention.default.onMessage(msg, { sock });
-            } catch (err) {
-              console.log('[WARN] Antimention error:', err.message);
+            // Use pre-imported antimention detection
+            if (antimention?.default?.onMessage) {
+              try {
+                await antimention.default.onMessage(msg, { sock });
+              } catch (err) {
+                console.log('[WARN] Antimention error:', err.message);
+              }
             }
 
             // Use the proper antilink detection system
