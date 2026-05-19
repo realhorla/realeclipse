@@ -96,7 +96,7 @@ if (bodyLower === "next") {
     const menuText = `╔╭━━〔 *𝔼𝕔𝕝ɪᴘꜱᴇ 𝕄𝔻* 〕━━╮
 
 │ ✦ Mᴏᴅᴇ : ${global.botMode || 'public'}
-│ ✦ Pʟᴜɢɪɴs : 656
+│ ✦ Pʟᴜɢɪɴs : 662
 │ ✦ Vᴇʀsɪᴏɴ : 1.3.9
 │ ✦ Year : 2025 - 2026
 │ ✦ Under Maintainance : true
@@ -270,11 +270,12 @@ if (bodyLower === "next") {
 ┃✪  ${prefix}gitrepo
 ╰━━━━━━━━━━━━━━━━━⊷
 
-╭━━━✦❮ 🖼️ IMAGE ANALYZING ❯✦━⊷
+╭━━━✦❮ 🖼️ IMAGE ANALYZING & TOOLS ❯✦━⊷
 ┃✪  ${prefix}vision
 ┃✪  ${prefix}remini
 ┃✪  ${prefix}colorize
 ┃✪  ${prefix}dehaze
+┃✪  ${prefix}removebg
 ┃✪  ${prefix}bing (self)
 ╰━━━━━━━━━━━━━━━━━⊷
 
@@ -406,6 +407,8 @@ if (bodyLower === "next") {
 ┃✪  ${prefix}twitter
 ┃✪  ${prefix}yt
 ┃✪  ${prefix}movie
+┃✪  ${prefix}dlmovie
+┃✪  ${prefix}smsubs
 ┃✪  ${prefix}pastebin
 ┃✪  ${prefix}mediafire
 ┃✪  ${prefix}googledrive
